@@ -24,6 +24,8 @@ const roleImages = {
   cleric: "/picture/cleric.png"
 };
 
+const roleOrder = ["swordsman", "mage", "martial", "curser", "cleric"];
+
 const breakImages = {
   BREAK: "/picture/break.png",
   "SUPER BREAK": "/picture/super_break.png",
@@ -117,6 +119,21 @@ function skillAllowedForRole(skill) {
   return skill.role === "全ロール" || skill.role === roleName;
 }
 
+function setSelectedRole(roleId) {
+  if (!state.catalog.roles[roleId]) return;
+  state.selectedRole = roleId;
+  for (const skillId of [...state.skills]) {
+    if (!skillAllowedForRole(state.catalog.skills[skillId])) state.skills.delete(skillId);
+  }
+  renderBuilder();
+}
+
+function moveRole(direction) {
+  const current = roleOrder.indexOf(state.selectedRole);
+  const next = (current + direction + roleOrder.length) % roleOrder.length;
+  setSelectedRole(roleOrder[next]);
+}
+
 function totalCost() {
   const normalCost = state.normalCards.reduce((sum, cardId) => sum + normalDef(cardId).cost, 0);
   const skillCost = [...state.skills].reduce((sum, skillId) => sum + state.catalog.skills[skillId].cost, 0);
@@ -154,13 +171,20 @@ function normalEffectTag(card) {
 function renderBuilder() {
   const catalog = state.catalog;
   sortDeckNormals();
-  $("#roleGrid").innerHTML = Object.entries(catalog.roles).map(([id, role]) => `
-    <button class="role-card ${state.selectedRole === id ? "selected" : ""}" data-role="${id}">
-      <img class="role-art" src="${roleImages[id]}" alt="">
-      <strong>${role.name}</strong>
-      <span>${role.passive}</span>
-    </button>
-  `).join("");
+  const currentIndex = roleOrder.indexOf(state.selectedRole);
+  $("#roleStage").innerHTML = [-1, 0, 1].map(offset => {
+    const index = (currentIndex + offset + roleOrder.length) % roleOrder.length;
+    const id = roleOrder[index];
+    const role = catalog.roles[id];
+    return `
+      <button class="role-slide ${offset === 0 ? "active" : "side"}" data-role="${id}" data-offset="${offset}" type="button">
+        <img class="role-portrait" src="${roleImages[id]}" alt="">
+        <strong>${role.name}</strong>
+        <span>${role.passive}</span>
+      </button>
+    `;
+  }).join("");
+  $("#roleDots").innerHTML = roleOrder.map(id => `<button class="role-dot ${state.selectedRole === id ? "active" : ""}" data-role="${id}" type="button"></button>`).join("");
 
   const normalChoices = [
     ...Array.from({ length: 10 }, (_, index) => `num_${index + 1}`),
@@ -579,11 +603,10 @@ async function leaveQueue() {
 document.addEventListener("click", event => {
   const roleButton = event.target.closest("[data-role]");
   if (roleButton) {
-    state.selectedRole = roleButton.dataset.role;
-    for (const skillId of [...state.skills]) {
-      if (!skillAllowedForRole(state.catalog.skills[skillId])) state.skills.delete(skillId);
-    }
-    renderBuilder();
+    const offset = Number(roleButton.dataset.offset || 0);
+    if (offset === -1) moveRole(-1);
+    else if (offset === 1) moveRole(1);
+    else setSelectedRole(roleButton.dataset.role);
     return;
   }
 
@@ -635,6 +658,8 @@ document.addEventListener("click", event => {
 $("#queueButton").addEventListener("click", () => queue().catch(error => {
   $("#builderError").textContent = error.message;
 }));
+$("#rolePrevButton").addEventListener("click", () => moveRole(-1));
+$("#roleNextButton").addEventListener("click", () => moveRole(1));
 $("#resetNormalButton").addEventListener("click", () => {
   state.normalCards = [];
   renderBuilder();
@@ -646,6 +671,21 @@ $("#resetSkillButton").addEventListener("click", () => {
 $("#cancelQueueButton").addEventListener("click", () => leaveQueue().catch(() => {}));
 $("#submitActionButton").addEventListener("click", submitAction);
 $("#returnBuilderButton").addEventListener("click", () => leaveQueue().catch(() => {}));
+
+let roleDragStartX = null;
+$("#roleCarousel").addEventListener("pointerdown", event => {
+  roleDragStartX = event.clientX;
+});
+$("#roleCarousel").addEventListener("pointerup", event => {
+  if (roleDragStartX === null) return;
+  const delta = event.clientX - roleDragStartX;
+  roleDragStartX = null;
+  if (Math.abs(delta) < 36) return;
+  moveRole(delta < 0 ? 1 : -1);
+});
+$("#roleCarousel").addEventListener("pointercancel", () => {
+  roleDragStartX = null;
+});
 
 (async function init() {
   state.catalog = await api("/api/catalog");

@@ -201,13 +201,39 @@ h2 {
   border-color: var(--sky);
 }
 
-.role-grid {
+.role-carousel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: 38px 1fr 38px;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  touch-action: pan-y;
 }
 
-.role-card,
+.role-stage {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: .44fr 1fr .44fr;
+  align-items: center;
+  gap: 6px;
+  min-height: 390px;
+  overflow: hidden;
+}
+
+.role-arrow {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  min-height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.role-slide,
 .normal-card,
 .skill-card,
 .battle-card,
@@ -219,22 +245,60 @@ h2 {
   text-align: left;
 }
 
-.role-card {
-  min-height: 86px;
+.role-slide {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  min-height: 360px;
   padding: 10px;
   overflow: hidden;
   position: relative;
+  text-align: center;
+  transition: transform .22s ease, opacity .22s ease, filter .22s ease;
 }
 
-.role-art {
+.role-slide.side {
+  min-height: 300px;
+  opacity: .48;
+  transform: scale(.88);
+  filter: saturate(.7);
+}
+
+.role-slide.active {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, .55) inset, 0 14px 38px rgba(0, 0, 0, .25);
+}
+
+.role-portrait {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 260px;
   display: block;
-  object-fit: cover;
-  object-position: top center;
+  object-fit: contain;
+  object-position: center bottom;
   border-radius: 6px;
-  margin-bottom: 8px;
-  opacity: .92;
+  margin-bottom: 10px;
+  background: radial-gradient(circle at 50% 38%, rgba(251, 191, 36, .14), transparent 65%), #11131a;
+}
+
+.role-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.role-dot {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--line);
+  padding: 0;
+}
+
+.role-dot.active {
+  width: 22px;
+  border-radius: 999px;
+  background: var(--sky);
 }
 
 .role-card.selected,
@@ -246,6 +310,7 @@ h2 {
   box-shadow: 0 0 0 1px rgba(56, 189, 248, .55) inset;
 }
 
+.role-slide strong,
 .role-card strong,
 .skill-card strong,
 .battle-skill strong {
@@ -253,6 +318,7 @@ h2 {
   font-size: .95rem;
 }
 
+.role-slide span,
 .role-card span,
 .skill-card p,
 .battle-skill p {
@@ -261,6 +327,14 @@ h2 {
   color: var(--muted);
   font-size: .74rem;
   line-height: 1.35;
+}
+
+.role-slide.active strong {
+  font-size: 1.1rem;
+}
+
+.role-slide.side span {
+  display: none;
 }
 
 .deck-strip {
