@@ -339,8 +339,9 @@ function showResultModal(data) {
   const isDraw = !data.winnerId;
   const isWin = data.winnerId === data.you.id;
   const isOverBreak = data.lastTurn?.overBreak?.some(item => item.playerId === data.winnerId);
-  $("#resultImage").src = isOverBreak ? breakImages["OVER BREAK"] : "/picture/title.png";
-  $("#resultImage").classList.remove("hidden");
+  const logo = $("#resultLogo");
+  logo.className = `result-logo ${isDraw ? "draw" : isWin ? "victory" : "defeat"} ${isOverBreak ? "over" : ""}`;
+  logo.textContent = isDraw ? "DRAW" : isOverBreak ? "OVER BREAK" : isWin ? "VICTORY" : "LOSE";
   $("#resultKicker").textContent = isDraw ? "Draw" : isWin ? "Victory" : "Defeat";
   $("#resultTitle").textContent = isDraw ? "引き分け" : isWin ? "勝利" : "敗北";
   $("#resultText").textContent = data.resultText;
