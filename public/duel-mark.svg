@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="HP Card Duel">
+  <defs>
+    <linearGradient id="g" x1="18" y1="15" x2="110" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7dd3fc"/>
+      <stop offset=".48" stop-color="#fcd34d"/>
+      <stop offset="1" stop-color="#fb7185"/>
+    </linearGradient>
+  </defs>
+  <rect x="14" y="14" width="100" height="100" rx="22" fill="#15151d"/>
+  <path d="M43 28h42l11 22-32 52L32 50l11-22Z" fill="url(#g)"/>
+  <path d="M47 40h34l5 10-22 35-22-35 5-10Z" fill="#15151d" opacity=".86"/>
+  <path d="M64 47v27M51 61h26" stroke="#f8fafc" stroke-width="8" stroke-linecap="round"/>
+</svg>

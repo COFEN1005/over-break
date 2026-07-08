@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: over-break
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production

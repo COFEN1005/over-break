@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>OVER ∞ BREAK</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <img src="/picture/title.png" alt="" class="title-art">
+      <div>
+        <h1>OVER ∞ BREAK</h1>
+        <p id="statusLine">デッキを編成してください</p>
+      </div>
+    </header>
+
+    <section id="builderView" class="view">
+      <div class="panel identity-panel">
+        <label class="field">
+          <span>名前</span>
+          <input id="playerName" maxlength="16" autocomplete="nickname" value="Player">
+        </label>
+        <div class="cost-meter">
+          <span>Cost</span>
+          <strong id="costText">0 / 35</strong>
+          <div class="meter"><i id="costFill"></i></div>
+        </div>
+      </div>
+
+      <section class="section-block">
+        <h2>ロール</h2>
+        <div id="roleGrid" class="role-grid"></div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-head">
+          <h2>通常カード</h2>
+          <div class="head-actions">
+            <span id="normalCount" class="pill">0 / 7</span>
+            <button id="resetNormalButton" class="tiny-action" type="button">リセット</button>
+          </div>
+        </div>
+        <div id="normalDeck" class="deck-strip"></div>
+        <div id="normalGrid" class="card-grid"></div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-head">
+          <h2>スキル</h2>
+          <div class="head-actions">
+            <span id="skillCount" class="pill">0枚</span>
+            <button id="resetSkillButton" class="tiny-action" type="button">リセット</button>
+          </div>
+        </div>
+        <div id="skillGrid" class="skill-list"></div>
+      </section>
+
+      <button id="queueButton" class="primary-action">マッチング開始</button>
+      <p id="builderError" class="error-text"></p>
+    </section>
+
+    <section id="waitingView" class="view hidden">
+      <div class="waiting-card">
+        <div class="pulse-ring"></div>
+        <h2>対戦相手を探しています</h2>
+        <p>別ブラウザや別端末からもう1人が参加すると開始します。</p>
+        <button id="cancelQueueButton" class="ghost-action">キャンセル</button>
+      </div>
+    </section>
+
+    <section id="battleView" class="view hidden">
+      <div class="battle-score">
+        <div class="fighter you">
+          <span id="youName">You</span>
+          <strong id="youHp">15</strong>
+          <div class="fighter-meta">
+            <b id="youBreak">なし</b>
+            <small id="youStreak">連続 0</small>
+          </div>
+          <i id="youHpBar"></i>
+        </div>
+        <div class="turn-badge">T<span id="turnText">1</span></div>
+        <div class="fighter enemy">
+          <span id="opponentName">Enemy</span>
+          <strong id="opponentHp">15</strong>
+          <div class="fighter-meta">
+            <b id="opponentBreak">なし</b>
+            <small id="opponentStreak">連続 0</small>
+          </div>
+          <i id="opponentHpBar"></i>
+        </div>
+      </div>
+
+      <section class="match-info">
+        <div>
+          <span class="label">自分</span>
+          <strong id="youRole">-</strong>
+        </div>
+        <div class="ready-state" id="readyState">選択中</div>
+        <div>
+          <span class="label">相手公開</span>
+          <strong id="opponentRole">-</strong>
+        </div>
+      </section>
+
+      <section id="effectPanel" class="effect-panel">
+        <div>
+          <span class="label">自分の継続効果</span>
+          <div id="youEffects" class="effect-list"></div>
+        </div>
+        <div>
+          <span class="label">相手の継続効果</span>
+          <div id="opponentEffects" class="effect-list"></div>
+        </div>
+      </section>
+
+      <section id="turnResultPanel" class="turn-result hidden">
+        <div class="section-head">
+          <h2 id="turnResultTitle">Turn Result</h2>
+          <span class="pill">公開</span>
+        </div>
+        <div id="playedCards" class="played-cards"></div>
+        <div id="damageSummary" class="damage-summary"></div>
+        <div id="breakSummary" class="break-summary"></div>
+      </section>
+
+      <section class="battle-picker">
+        <div class="battle-tabs" role="tablist" aria-label="カード選択">
+          <button class="tab-button active" data-battle-tab="normal" type="button">通常</button>
+          <button class="tab-button" data-battle-tab="skill" type="button">スキル</button>
+        </div>
+        <div id="normalTabPanel" class="tab-panel">
+          <div class="section-head compact-head">
+            <h2>出す通常カード</h2>
+            <span class="pill">1枚必須</span>
+          </div>
+          <div id="battleNormalGrid" class="battle-cards"></div>
+        </div>
+        <div id="skillTabPanel" class="tab-panel hidden">
+          <div class="section-head compact-head">
+            <h2>スキル</h2>
+            <span class="pill">未選択OK</span>
+          </div>
+          <div id="battleSkillGrid" class="battle-skills"></div>
+        </div>
+      </section>
+
+      <section class="section-block opponent-public">
+        <h2>相手の通常カード</h2>
+        <div id="opponentNormalGrid" class="mini-cards"></div>
+      </section>
+
+      <section class="log-panel">
+        <h2>ログ</h2>
+        <div id="logList"></div>
+      </section>
+
+      <div class="battle-action-bar">
+        <div class="selection-summary">
+          <div>
+            <span>通常</span>
+            <strong id="selectedNormalText">未選択</strong>
+          </div>
+          <div>
+            <span>スキル</span>
+            <strong id="selectedSkillText">なし</strong>
+          </div>
+        </div>
+        <button id="submitActionButton" class="primary-action">行動を決定</button>
+        <p id="battleError" class="error-text"></p>
+      </div>
+    </section>
+
+    <div id="resultModal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <img id="resultImage" class="modal-art hidden" alt="">
+        <span id="resultKicker" class="pill">Result</span>
+        <h2 id="resultTitle">勝敗</h2>
+        <p id="resultText"></p>
+        <button id="returnBuilderButton" class="primary-action">デッキ編成に戻る</button>
+      </div>
+    </div>
+
+    <div id="breakOverlay" class="break-overlay hidden" aria-hidden="true">
+      <img id="breakOverlayImage" alt="">
+      <strong id="breakOverlayText">BREAK</strong>
+      <span id="breakOverlaySub"></span>
+    </div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
