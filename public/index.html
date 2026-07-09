@@ -80,9 +80,12 @@
         <div class="fighter you">
           <span id="youName">You</span>
           <strong id="youHp">15</strong>
-          <div class="fighter-meta">
-            <b id="youBreak">なし</b>
-            <small id="youStreak">連続 0</small>
+          <div class="fighter-meters">
+            <div id="youBreakMeter" class="break-meter">
+              <b id="youBreak">BREAK 0 / 4</b>
+              <div id="youBreakPips" class="meter-pips" aria-label="Your BREAK gauge"></div>
+            </div>
+            <div id="youStreak" class="streak-meter">HIT STREAK 0 / 3</div>
           </div>
           <i id="youHpBar"></i>
         </div>
@@ -90,9 +93,12 @@
         <div class="fighter enemy">
           <span id="opponentName">Enemy</span>
           <strong id="opponentHp">15</strong>
-          <div class="fighter-meta">
-            <b id="opponentBreak">なし</b>
-            <small id="opponentStreak">連続 0</small>
+          <div class="fighter-meters">
+            <div id="opponentBreakMeter" class="break-meter">
+              <b id="opponentBreak">BREAK 0 / 4</b>
+              <div id="opponentBreakPips" class="meter-pips" aria-label="Enemy BREAK gauge"></div>
+            </div>
+            <div id="opponentStreak" class="streak-meter">HIT STREAK 0 / 3</div>
           </div>
           <i id="opponentHpBar"></i>
         </div>
@@ -189,9 +195,21 @@
     </div>
 
     <div id="breakOverlay" class="break-overlay hidden" aria-hidden="true">
-      <img id="breakOverlayImage" alt="">
-      <strong id="breakOverlayText">BREAK</strong>
-      <span id="breakOverlaySub"></span>
+      <div class="break-dim"></div>
+      <div class="break-flash"></div>
+      <div class="break-direction"></div>
+      <div class="break-infinity" aria-hidden="true">
+        <span class="infinity-half left">∞</span>
+        <span class="infinity-half right">∞</span>
+        <i></i>
+      </div>
+      <div class="break-core">
+        <img id="breakOverlayImage" alt="">
+        <strong id="breakOverlayText">YOU BREAK!</strong>
+        <b id="breakOverlayCount">BREAK +1</b>
+        <span id="breakOverlaySub"></span>
+        <em id="breakOverlayOutcome"></em>
+      </div>
     </div>
   </main>
 

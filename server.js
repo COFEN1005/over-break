@@ -495,8 +495,22 @@ function stateFor(playerId) {
     waitingForOpponent: Boolean(you.action && !opponent.action),
     opponentReady: Boolean(opponent.action),
     yourAction: you.action,
-    lastTurn: game.lastTurn,
+    lastTurn: perspectiveLastTurn(game.lastTurn, playerId),
     log: game.log.slice(-24)
+  };
+}
+
+function perspectiveLastTurn(lastTurn, playerId) {
+  if (!lastTurn) return null;
+  const withOwner = item => ({
+    ...item,
+    owner: item.playerId === playerId ? "player" : "enemy"
+  });
+  return {
+    ...lastTurn,
+    breaks: (lastTurn.breaks || []).map(withOwner),
+    chainBreaks: (lastTurn.chainBreaks || []).map(withOwner),
+    overBreak: (lastTurn.overBreak || []).map(withOwner)
   };
 }
 

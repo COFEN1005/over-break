@@ -11,7 +11,8 @@ const state = {
   lastGameId: null,
   currentBattle: null,
   resultModalGameId: null,
-  lastBreakAnimationKey: null
+  lastBreakAnimationKey: null,
+  breakAnimating: false
 };
 
 const $ = selector => document.querySelector(selector);
@@ -255,6 +256,18 @@ function breakClass(label) {
   return label.toLowerCase().replace(/\s+/g, "-");
 }
 
+function renderCombatMeter(side, player) {
+  const count = Math.max(0, player.breakCount || 0);
+  const capped = Math.min(4, count);
+  const label = count >= 4 ? "OVER BREAK" : "BREAK";
+  $(`#${side}Break`).textContent = `${label} ${count} / 4`;
+  $(`#${side}Break`).className = `break-badge ${breakClass(player.breakLabel)}`;
+  $(`#${side}BreakPips`).innerHTML = Array.from({ length: 4 }, (_, index) =>
+    `<i class="${index < capped ? "filled" : ""}"></i>`
+  ).join("");
+  $(`#${side}Streak`).textContent = `HIT STREAK ${player.normalHitStreak || 0} / 3`;
+}
+
 function selectedNormalName(cards) {
   const card = cards.find(item => item.instanceId === state.selectedNormal);
   return card ? card.name : "未選択";
@@ -324,11 +337,11 @@ function renderTurnResult(data) {
   const chains = data.lastTurn.chainBreaks || [];
   const overs = data.lastTurn.overBreak || [];
   $("#breakSummary").innerHTML = [...chains.map(chain => `
-    <div class="break-line chain">CHAIN BREAK x${chain.count}<small>${chain.playerName}</small></div>
+    <div class="break-line chain">${chain.owner === "player" ? "YOUR" : "ENEMY"} CHAIN BREAK x${chain.count}<small>${chain.playerName}</small></div>
   `), ...breaks.map(item => `
-    <div class="break-line ${breakClass(item.label)}">${item.label}<small>${item.playerName} / ${item.reason}</small></div>
+    <div class="break-line ${breakClass(item.label)}">${item.owner === "player" ? "YOUR" : "ENEMY"} ${item.label}<small>${item.playerName} / ${displayBreakReason(item.reason)}</small></div>
   `), ...overs.map(item => `
-    <div class="break-line over-break">OVER BREAK<small>${item.playerName}</small></div>
+    <div class="break-line over-break">${item.owner === "player" ? "YOUR" : "ENEMY"} OVER BREAK<small>${item.playerName}</small></div>
   `)].join("");
   panel.classList.remove("hidden");
 }
@@ -341,23 +354,132 @@ function showResultModal(data) {
   const isOverBreak = data.lastTurn?.overBreak?.some(item => item.playerId === data.winnerId);
   const logo = $("#resultLogo");
   logo.className = `result-logo ${isDraw ? "draw" : isWin ? "victory" : "defeat"} ${isOverBreak ? "over" : ""}`;
-  logo.textContent = isDraw ? "DRAW" : isOverBreak ? "OVER BREAK" : isWin ? "VICTORY" : "LOSE";
+  logo.textContent = isDraw ? "DRAW" : isWin ? "VICTORY" : "LOSE";
   $("#resultKicker").textContent = isDraw ? "Draw" : isWin ? "Victory" : "Defeat";
   $("#resultTitle").textContent = isDraw ? "引き分け" : isWin ? "勝利" : "敗北";
   $("#resultText").textContent = data.resultText;
   $("#resultModal").classList.remove("hidden");
 }
 
-function showBreakOverlay(imageSrc, text, subText) {
+function sleep(ms) {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+function displayBreakReason(reason) {
+  if (reason === "連続成功") return "3連続通常攻撃成功";
+  return reason;
+}
+
+function subjectFor(owner) {
+  return owner === "player" ? "YOUR" : "ENEMY";
+}
+
+function setBreakLock(locked) {
+  state.breakAnimating = locked;
+  document.body.classList.toggle("break-cinematic", locked);
+  $("#breakOverlay").setAttribute("aria-hidden", String(!locked));
+  if (locked) $("#submitActionButton").disabled = true;
+}
+
+function resetBreakOverlay() {
   const overlay = $("#breakOverlay");
-  $("#breakOverlayImage").src = imageSrc;
+  overlay.className = "break-overlay hidden";
+  $("#battleView").classList.remove("cinematic-shake", "cinematic-shake-over");
+  $("#breakOverlayImage").removeAttribute("src");
+  $("#breakOverlayText").textContent = "";
+  $("#breakOverlayCount").textContent = "";
+  $("#breakOverlaySub").textContent = "";
+  $("#breakOverlayOutcome").textContent = "";
+}
+
+function showBreakFrame({ owner, label, text, countText, subText, mode = "break" }) {
+  const overlay = $("#breakOverlay");
+  overlay.className = `break-overlay owner-${owner} mode-${mode}`;
+  const image = $("#breakOverlayImage");
+  image.classList.remove("missing");
+  image.onerror = () => image.classList.add("missing");
+  image.src = breakImages[label] || breakImages.BREAK;
   $("#breakOverlayText").textContent = text;
+  $("#breakOverlayCount").textContent = countText || "";
   $("#breakOverlaySub").textContent = subText || "";
-  overlay.classList.remove("hidden");
-  overlay.classList.remove("burst");
+  $("#breakOverlayOutcome").textContent = "";
+  const battleView = $("#battleView");
+  battleView.classList.remove("cinematic-shake", "cinematic-shake-over");
+  void battleView.offsetWidth;
+  battleView.classList.add(mode === "over" ? "cinematic-shake-over" : "cinematic-shake");
   void overlay.offsetWidth;
-  overlay.classList.add("burst");
-  window.setTimeout(() => overlay.classList.add("hidden"), 1500);
+  overlay.classList.add("playing");
+}
+
+function pulseBreakPanel(owner) {
+  const source = owner === "player" ? $(".fighter.you") : $(".fighter.enemy");
+  const target = owner === "player" ? $(".fighter.enemy") : $(".fighter.you");
+  const meter = owner === "player" ? $("#youBreakMeter") : $("#opponentBreakMeter");
+  source.classList.remove("break-source-pulse");
+  target.classList.remove("break-impact-pulse");
+  meter.classList.remove("meter-level-up");
+  void source.offsetWidth;
+  source.classList.add("break-source-pulse");
+  target.classList.add("break-impact-pulse");
+  meter.classList.add("meter-level-up");
+}
+
+async function playBreakSequence(data, breaks, chains, overs) {
+  setBreakLock(true);
+  const regularBreaks = breaks.filter(item => item.count < 4);
+
+  for (const item of regularBreaks) {
+    pulseBreakPanel(item.owner);
+    showBreakFrame({
+      owner: item.owner,
+      label: item.label,
+      text: `${subjectFor(item.owner)} ${item.label}!`,
+      countText: "BREAK +1",
+      subText: displayBreakReason(item.reason)
+    });
+    await sleep(regularBreaks.length > 1 ? 320 : 980);
+  }
+  if (regularBreaks.length > 1) await sleep(620);
+
+  for (const chain of chains) {
+    const reasons = breaks
+      .filter(item => item.playerId === chain.playerId)
+      .map(item => displayBreakReason(item.reason))
+      .join(" / ");
+    pulseBreakPanel(chain.owner);
+    showBreakFrame({
+      owner: chain.owner,
+      label: "CHAIN",
+      text: `${subjectFor(chain.owner)} CHAIN BREAK x${chain.count}`,
+      countText: `+${chain.count} BREAK`,
+      subText: reasons,
+      mode: "chain"
+    });
+    await sleep(1200);
+  }
+
+  for (const item of overs) {
+    pulseBreakPanel(item.owner);
+    showBreakFrame({
+      owner: item.owner,
+      label: "OVER BREAK",
+      text: `${subjectFor(item.owner)} OVER BREAK`,
+      countText: "",
+      subText: item.playerName,
+      mode: "over"
+    });
+    $("#breakOverlayOutcome").textContent = overs.length > 1 || !data.winnerId
+      ? "DRAW"
+      : item.owner === "player" ? "YOU WIN" : "YOU LOSE";
+    await sleep(2300);
+  }
+
+  resetBreakOverlay();
+  setBreakLock(false);
+  if (state.currentBattle) {
+    renderBattleControls(state.currentBattle);
+    showResultModal(state.currentBattle);
+  }
 }
 
 function maybeShowBreakAnimation(data) {
@@ -366,22 +488,27 @@ function maybeShowBreakAnimation(data) {
   const chains = data.lastTurn.chainBreaks || [];
   const overs = data.lastTurn.overBreak || [];
   if (!breaks.length && !chains.length && !overs.length) return;
-  const key = `${data.gameId}:${data.lastTurn.turn}:${breaks.length}:${chains.map(c => c.count).join(",")}:${overs.length}`;
+  const key = `${data.gameId}:${data.lastTurn.turn}:${breaks.map(item => `${item.playerId}:${item.count}`).join(",")}`;
   if (state.lastBreakAnimationKey === key) return;
   state.lastBreakAnimationKey = key;
+  playBreakSequence(data, breaks, chains, overs);
+}
 
-  if (overs.length) {
-    const mine = overs.find(item => item.playerId === data.you.id) || overs[0];
-    showBreakOverlay(breakImages["OVER BREAK"], "OVER BREAK", mine.playerName);
+function renderBattleControls(data) {
+  if (state.breakAnimating) {
+    $("#submitActionButton").disabled = true;
     return;
   }
-  if (chains.length) {
-    const chain = chains[0];
-    showBreakOverlay(breakImages.CHAIN, `CHAIN BREAK x${chain.count}`, chain.playerName);
-    return;
+  if (data.status === "finished") {
+    $("#submitActionButton").disabled = true;
+    $("#submitActionButton").textContent = "対戦終了";
+  } else if (data.waitingForOpponent) {
+    $("#submitActionButton").disabled = false;
+    $("#submitActionButton").textContent = "選択を変更する";
+  } else {
+    $("#submitActionButton").disabled = !state.selectedNormal;
+    $("#submitActionButton").textContent = "行動を決定";
   }
-  const strongest = breaks.reduce((best, item) => (item.count > best.count ? item : best), breaks[0]);
-  showBreakOverlay(breakImages[strongest.label] || breakImages.BREAK, strongest.label, `${strongest.playerName} / ${strongest.reason}`);
 }
 
 function renderBattle(data) {
@@ -400,12 +527,8 @@ function renderBattle(data) {
   $("#opponentHp").textContent = opponent.hp;
   $("#youHpBar").style.width = hpWidth(you.hp);
   $("#opponentHpBar").style.width = hpWidth(opponent.hp);
-  $("#youBreak").textContent = you.breakLabel;
-  $("#opponentBreak").textContent = opponent.breakLabel;
-  $("#youBreak").className = `break-badge ${breakClass(you.breakLabel)}`;
-  $("#opponentBreak").className = `break-badge ${breakClass(opponent.breakLabel)}`;
-  $("#youStreak").textContent = `連続 ${you.normalHitStreak}`;
-  $("#opponentStreak").textContent = `連続 ${opponent.normalHitStreak}`;
+  renderCombatMeter("you", you);
+  renderCombatMeter("opponent", opponent);
   $("#youRole").textContent = you.roleName;
   $("#opponentRole").textContent = `${opponent.roleName} / ${sortNormalCards(opponent.normalCards).map(card => card.name).join("・")}`;
   renderEffects($("#youEffects"), you.effects, you.holyShields);
@@ -435,9 +558,8 @@ function renderBattle(data) {
     $("#submitActionButton").textContent = "選択を変更する";
   } else {
     setStatus(data.opponentReady ? `Turn ${data.turn} 相手は決定済み` : `Turn ${data.turn} 行動選択`);
-    $("#submitActionButton").disabled = !state.selectedNormal;
-    $("#submitActionButton").textContent = "行動を決定";
   }
+  renderBattleControls(data);
   $("#selectedNormalText").textContent = selectedNormalName(sortedYouNormals);
   $("#selectedSkillText").textContent = selectedSkillName(you.skills);
   $("#battleNormalGrid").innerHTML = sortedYouNormals.map(card => `
@@ -475,10 +597,21 @@ function renderBattle(data) {
     </div>
   `).join("");
 
-  $("#logList").innerHTML = data.log.slice().reverse().map(line => `<div class="log-line">${line}</div>`).join("");
+  const perspectiveBreakLogs = (data.lastTurn?.breaks || []).map(item =>
+    `${item.owner === "player" ? "あなた" : "相手"}のBREAK +1：${displayBreakReason(item.reason)}`
+  );
+  const perspectiveChainLogs = (data.lastTurn?.chainBreaks || []).map(chain => {
+    const reasons = (data.lastTurn.breaks || [])
+      .filter(item => item.playerId === chain.playerId)
+      .map(item => displayBreakReason(item.reason))
+      .join(" / ");
+    return `${chain.owner === "player" ? "あなた" : "相手"}のCHAIN BREAK x${chain.count}：${reasons}`;
+  });
+  $("#logList").innerHTML = [...perspectiveChainLogs, ...perspectiveBreakLogs, ...data.log.slice().reverse()]
+    .map(line => `<div class="log-line">${line}</div>`).join("");
   renderTurnResult(data);
   maybeShowBreakAnimation(data);
-  showResultModal(data);
+  if (!state.breakAnimating) showResultModal(data);
 }
 
 async function ensureSession() {
@@ -539,6 +672,7 @@ async function pollState() {
 }
 
 async function submitAction() {
+  if (state.breakAnimating) return;
   $("#battleError").textContent = "";
   if (state.currentBattle?.waitingForOpponent) {
     try {
@@ -602,6 +736,7 @@ async function leaveQueue() {
 }
 
 document.addEventListener("click", event => {
+  if (state.breakAnimating) return;
   const roleButton = event.target.closest("[data-role]");
   if (roleButton) {
     const offset = Number(roleButton.dataset.offset || 0);
